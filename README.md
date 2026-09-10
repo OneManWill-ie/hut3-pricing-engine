@@ -24,6 +24,8 @@ Rules live in a single `rules` table with a `type` column and JSON `config` payl
 so adding a new rule type only needs a new branch in `pricing.js` and a new row shape
 without a new table or migration.
 
+![database schema](image.png)
+
 ## Current discount ordering
 
 1. BOGOF first as it changes how many units are actually being paid for, which everything
