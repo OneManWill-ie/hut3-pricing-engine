@@ -4,3 +4,4 @@ data/
 *.db-journal
 *.db-wal
 *.db-shm
+__pycache__/api_tests.cpython-310.pyc
