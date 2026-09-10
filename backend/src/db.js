@@ -28,20 +28,10 @@ db.exec(`
     amount_off_pence INTEGER NOT NULL
   );
 
-  -- "Buy X of item, get Y free" rules. Kept in its own table so a new rule
-  -- can be added later without touching existing rows or code paths.
-  CREATE TABLE IF NOT EXISTS bxgy_rules (
+  CREATE TABLE IF NOT EXISTS rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    item_name TEXT NOT NULL,
-    buy_quantity INTEGER NOT NULL,
-    free_quantity INTEGER NOT NULL
-  );
-
-  -- Percentage-off-whole-cart rules, gated by a subtotal threshold.
-  CREATE TABLE IF NOT EXISTS percent_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    threshold_pence INTEGER NOT NULL,
-    percent_off REAL NOT NULL
+    type TEXT NOT NULL,
+    config TEXT NOT NULL
   );
 `);
 
@@ -87,13 +77,16 @@ seedIfEmpty(
 );
 
 seedIfEmpty(
-  'bxgy_rules',
-  [{ item_name: 'USB-C Cable', buy_quantity: 3, free_quantity: 1 }],
-  'INSERT INTO bxgy_rules (item_name, buy_quantity, free_quantity) VALUES (@item_name, @buy_quantity, @free_quantity)'
-);
-
-seedIfEmpty(
-  'percent_rules',
-  [{ threshold_pence: 5000, percent_off: 10 }],
-  'INSERT INTO percent_rules (threshold_pence, percent_off) VALUES (@threshold_pence, @percent_off)'
+  'rules',
+  [
+    {
+      type: 'bxgy',
+      config: JSON.stringify({ item_name: 'USB-C Cable', buy_quantity: 3, free_quantity: 1 }),
+    },
+    {
+      type: 'percent',
+      config: JSON.stringify({ threshold_pence: 5000, percent_off: 10 }),
+    },
+  ],
+  'INSERT INTO rules (type, config) VALUES (@type, @config)'
 );

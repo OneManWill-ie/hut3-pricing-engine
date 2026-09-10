@@ -20,9 +20,9 @@ Running without Docker: `cd backend && npm install && npm run dev`, then
 
 ## Database
 
-Rules live in their own tables so a new rule of an existing
-type can be added via a DB row, and `pricing.js` is written so a new rule type only needs
-a new branch there, not a rewrite of the others.
+Rules live in a single `rules` table with a `type` column and JSON `config` payload,
+so adding a new rule type only needs a new branch in `pricing.js` and a new row shape
+without a new table or migration.
 
 ## Current discount ordering
 
@@ -30,13 +30,11 @@ a new branch there, not a rewrite of the others.
    else should be calculated from.
 2. Percentage off coupons.
 3. Flat coupon last, off whatever's left.
-4. Clamp at £0 — a coupon or discount can never push the total negative.
+4. Clamp at £0 so coupons or discounts can't push the total negative.
 
 
 ## Planned
 
-- Move rule types to a single `rules` table with a `type` + JSON `config` column, so adding
-  a rule type doesn't need a new table/migration.
 - Basic auth on the write endpoints (`POST/DELETE /api/cart`).
 - Some unit tests for `pricing.js`.
 - Go through and double check AI generated dependency versions.
@@ -44,3 +42,4 @@ a new branch there, not a rewrite of the others.
 ## AI-tool notes
 
 - Generated initial project structure and dockerfiles, but in the backend it used an image base that's securty was expired, so I needed to change that.
+- Got it to update the README after making changes

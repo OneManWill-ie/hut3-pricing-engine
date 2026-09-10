@@ -1,20 +1,29 @@
 /**
- * Pricing engine. 
+ * Pricing engine.
  *
- * All money is handled in pence to avoid floating point rounding issues
+ * All money is handled in pence to avoid floating point rounding issues.
  *
- * Currrent rule order (documented here + README):
- *   1. BOGOF applied first because it changes
- *      how many units of an item are actually charged for, which is an
- *      input to everything downstream.
- *   2. Percentage off the cart, applied to the subtotal *after* BOGOF,
+ * Current rule order (documented here + README):
+ *   1. BXGY applied first because it changes how many units of an item are
+ *      actually charged for, which is an input to everything downstream.
+ *   2. Percentage off the cart, applied to the subtotal *after* BXGY,
  *      so you don't get a percentage discount on units that were free anyway.
- *   3. Flat coupon code is applied last, since coupons
- *      are usually "£5 off however much you've already saved".
- *   4. Clamp at 0 so that the total can never go negative.
+ *   3. Flat coupon code applied last, since coupons are usually
+ *      "£5 off however much you've already saved".
+ *   4. Clamp at 0 so the total can never go negative.
+ * 
+ * How to add a new rule type:
+ *   1. Decide the new rule `type` string and shape of its JSON `config`.
+ *   2. Insert a row into the `rules` table in `backend/src/db.js` (or add a seed row
+ *      for that type if you want it enabled by default).
+ *   3. Add a new `rules.filter(...)` branch or explicit lookup here in `pricing.js`
+ *      to read that rule type from the parsed `rules` array.
+ *   4. Implement the new rule's calculation in the correct part of the rule order
+ *      (for example, BXGY first, percentage second, coupon last).
+ *
  */
 
-export function priceCart(cartItems, { bxgyRules, percentRules, coupon }) {
+export function priceCart(cartItems, { rules = [], coupon }) {
   if (!cartItems.length) {
     return {
       subtotal_pence: 0,
@@ -31,6 +40,9 @@ export function priceCart(cartItems, { bxgyRules, percentRules, coupon }) {
     quantity: item.quantity,
     line_total_pence: item.unit_price_pence * item.quantity,
   }));
+
+  const bxgyRules = rules.filter((rule) => rule.type === 'bxgy');
+  const percentRules = rules.filter((rule) => rule.type === 'percent');
 
   const subtotal_pence = line_items.reduce((sum, li) => sum + li.line_total_pence, 0);
 

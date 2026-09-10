@@ -111,8 +111,10 @@ app.post('/api/price', (req, res) => {
   // Edge case: negative/zero quantity rows shouldn't be priced as if real.
   const validItems = cartItems.filter((i) => i.quantity > 0);
 
-  const bxgyRules = db.prepare('SELECT * FROM bxgy_rules').all();
-  const percentRules = db.prepare('SELECT * FROM percent_rules').all();
+  const rules = db
+    .prepare('SELECT type, config FROM rules ORDER BY id')
+    .all()
+    .map(({ type, config }) => ({ type, ...JSON.parse(config) }));
 
   let coupon = null;
   let coupon_error = null;
@@ -121,7 +123,7 @@ app.post('/api/price', (req, res) => {
     if (!coupon) coupon_error = `Unknown coupon code "${coupon_code}"`;
   }
 
-  const result = priceCart(validItems, { bxgyRules, percentRules, coupon });
+  const result = priceCart(validItems, { rules, coupon });
 
   res.json({ ...result, coupon_applied: coupon?.code ?? null, coupon_error });
 });
