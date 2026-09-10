@@ -55,6 +55,28 @@ class PricingApiTests(unittest.TestCase):
     def setUpClass(cls):
         cls.client = ApiClient(args.base_url)
 
+    def _reset_cart(self):
+        status, cart = self.client.get_json("/api/cart")
+        self.assertEqual(status, 200)
+
+        for row in cart:
+            status, _ = self.client.delete(f"/api/cart/{row['id']}")
+            self.assertEqual(status, 204)
+
+    def _get_item_id_by_name(self, item_name):
+        status, items = self.client.get_json("/api/items")
+        self.assertEqual(status, 200)
+
+        item = next((i for i in items if i["name"] == item_name), None)
+        self.assertIsNotNone(item, f"Could not find item named '{item_name}'")
+        return item["id"]
+
+    def _add_cart_item(self, item_name, quantity):
+        item_id = self._get_item_id_by_name(item_name)
+        status, created = self.client.post_json("/api/cart", {"item_id": item_id, "quantity": quantity})
+        self.assertEqual(status, 201, created)
+        return created
+
     def test_get_cart(self):
         # Verifies the cart endpoint is reachable and returns a list of cart rows.
         status, data = self.client.get_json("/api/cart")
@@ -100,6 +122,59 @@ class PricingApiTests(unittest.TestCase):
         self.assertIn("total_pence", data)
         self.assertIn("line_items", data)
         self.assertIn("discounts", data)
+
+    def test_business_coupon_error_is_reported_without_crashing(self):
+        # Verifies unknown coupon codes are surfaced as a coupon error instead of breaking pricing.
+        self._reset_cart()
+
+        self._add_cart_item("Mechanical Keyboard", 1)
+
+        status, data = self.client.post_json("/api/price", {"coupon_code": "NOPE"})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(data["coupon_applied"], None)
+        self.assertIn("Unknown coupon code", data["coupon_error"])
+
+    def test_business_percentage_rule_applies_above_threshold(self):
+        # Verifies the percentage discount is applied once the cart subtotal clears the threshold.
+        self._reset_cart()
+
+        self._add_cart_item("Mechanical Keyboard", 1)
+
+        status, data = self.client.post_json("/api/price", {"coupon_code": ""})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(data["subtotal_pence"], 5499)
+        self.assertEqual(data["total_pence"], 4949)
+        self.assertEqual(len(data["discounts"]), 1)
+        self.assertEqual(data["discounts"][0]["type"], "percent")
+        self.assertEqual(data["discounts"][0]["amount_pence"], 550)
+
+    def test_business_invalid_item_id_returns_404(self):
+        # Verifies the API rejects unknown item ids instead of creating malformed cart rows.
+        self._reset_cart()
+
+        status, data = self.client.post_json("/api/cart", {"item_id": 999999, "quantity": 1})
+        self.assertEqual(status, 404)
+        self.assertIn("Unknown item id", data["error"])
+
+    def test_business_invalid_quantity_is_rejected(self):
+        # Verifies the API rejects invalid quantities so cart data stays consistent.
+        self._reset_cart()
+
+        item_id = self._get_item_id_by_name("Wireless Mouse")
+        status, data = self.client.post_json("/api/cart", {"item_id": item_id, "quantity": 0})
+        self.assertEqual(status, 400)
+        self.assertIn("quantity must be a positive integer", data["error"])
+
+    def test_business_coupon_cannot_make_total_negative(self):
+        # Verifies coupon discounts are capped at the current subtotal rather than producing below-zero totals.
+        self._reset_cart()
+
+        self._add_cart_item("Wireless Mouse", 1)
+
+        status, data = self.client.post_json("/api/price", {"coupon_code": "WELCOME10"})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(data["total_pence"], 999)
+        self.assertEqual(data["discounts"][0]["amount_pence"], 1000)
 
 
 if __name__ == "__main__":

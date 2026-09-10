@@ -45,3 +45,4 @@ without a new table or migration.
 
 - Generated initial project structure and dockerfiles, but in the backend it used an image base that's securty was expired, so I needed to change that.
 - Got it to update the README after making changes
+- Used AI to generate the initial unit test system 
