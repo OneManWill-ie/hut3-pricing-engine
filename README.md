@@ -18,6 +18,8 @@ one BXGY rule (buy 3 USB-C Cables, get 1 free), and one percentage rule (10% off
 Running without Docker: `cd backend && npm install && npm run dev`, then
 `cd frontend && npm install && npm run dev`.
 
+To refresh the environment do 'docker compose down -v' to remove the current data.
+
 ## Database
 
 Rules live in a single `rules` table with a `type` column and JSON `config` payload,
@@ -42,6 +44,6 @@ without a new table or migration.
 
 ## AI-tool notes
 
-- Generated initial project structure and dockerfiles, but in the backend it used an image base that's securty was expired, so I needed to change that.
+- Generated initial project structure and dockerfiles, but in the backend it used an image base that's securty was expired, so I needed to change that. In the initial files it also made a slightly weird database design where each rule would get its own table, I then go it to go back and change that to the current system of a rules table with json.
 - Got it to update the README after making changes
 - Used AI to generate the initial unit test system 
