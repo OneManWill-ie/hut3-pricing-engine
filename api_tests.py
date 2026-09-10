@@ -94,6 +94,16 @@ class PricingApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIsInstance(data, list)
 
+    def test_empty_cart_prices_to_zero(self):
+        # Verifies the pricing endpoint handles an empty cart without errors.
+        self._reset_cart()
+
+        status, data = self.client.post_json("/api/price", {"coupon_code": ""})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(data["subtotal_pence"], 0)
+        self.assertEqual(data["total_pence"], 0)
+        self.assertEqual(data["discounts"], [])
+
     def test_get_items(self):
         # Verifies the catalog endpoint returns item data with the expected fields.
         status, data = self.client.get_json("/api/items")
@@ -167,14 +177,32 @@ class PricingApiTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertIn("Unknown item id", data["error"])
 
-    def test_business_invalid_quantity_is_rejected(self):
-        # Verifies the API rejects invalid quantities so cart data stays consistent.
+    def test_business_zero_quantity_is_rejected(self):
+        # Verifies the API rejects zero quantities so cart data stays consistent.
         self._reset_cart()
 
         item_id = self._get_item_id_by_name("Wireless Mouse")
         status, data = self.client.post_json("/api/cart", {"item_id": item_id, "quantity": 0})
         self.assertEqual(status, 400)
         self.assertIn("quantity must be a positive integer", data["error"])
+
+    def test_business_negative_quantity_is_rejected(self):
+        # Verifies the API rejects negative quantities so invalid cart rows are never created.
+        self._reset_cart()
+
+        item_id = self._get_item_id_by_name("Wireless Mouse")
+        status, data = self.client.post_json("/api/cart", {"item_id": item_id, "quantity": -1})
+        self.assertEqual(status, 400)
+        self.assertIn("quantity must be a positive integer", data["error"])
+
+    def test_protected_endpoints_require_authentication(self):
+        # Verifies authenticated cart writes are blocked unless a valid session UUID is provided.
+        unauthenticated_client = ApiClient(args.base_url)
+        item_id = self._get_item_id_by_name("Wireless Mouse")
+
+        status, data = unauthenticated_client.post_json("/api/cart", {"item_id": item_id, "quantity": 1})
+        self.assertEqual(status, 401, data)
+        self.assertIn("Missing session", data["error"])
 
     def test_business_coupon_cannot_make_total_negative(self):
         # Verifies coupon discounts are capped at the current subtotal rather than producing below-zero totals.
