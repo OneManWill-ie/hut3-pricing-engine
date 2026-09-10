@@ -28,11 +28,22 @@ without a new table or migration.
 
 ![database schema](image.png)
 
+## API design decision
+
+The API uses a persisted-cart flow rather than sending the complete cart in the pricing
+request. The cart is built and stored through `POST /api/cart`, can be read with
+`GET /api/cart`, and is then priced by `POST /api/price`. This means the API accepts a
+cart through its cart endpoints and returns the priced, itemised result from the pricing
+endpoint, while keeping the cart and its quantities in the database as required.
+
+`POST /api/price` accepts an optional coupon body such as
+`{ "coupon_code": "SAVE5" }` and prices the current persisted cart.
+
 ## Current discount ordering
 
-1. BOGOF first as it changes how many units are actually being paid for, which everything
+1. Buy-X-get-Y-free rules first as they change how many units are actually being paid for, which everything
    else should be calculated from.
-2. Percentage off coupons.
+2. Percentage discount rules, applied when the cart passes their configured threshold.
 3. Flat coupon last, off whatever's left.
 4. Clamp at £0 so coupons or discounts can't push the total negative.
 
