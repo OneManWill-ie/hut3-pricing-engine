@@ -38,7 +38,6 @@ without a new table or migration.
 ## Planned
 
 - Basic auth on the write endpoints (`POST/DELETE /api/cart`).
-- Some unit tests for `pricing.js`.
 - Go through and double check AI generated dependency versions.
 
 ## AI-tool notes
