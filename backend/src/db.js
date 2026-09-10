@@ -33,6 +33,20 @@ db.exec(`
     type TEXT NOT NULL,
     config TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    session_uuid TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
 `);
 
 
@@ -74,6 +88,12 @@ seedIfEmpty(
     { code: 'WELCOME10', amount_off_pence: 1000 },
   ],
   'INSERT INTO coupons (code, amount_off_pence) VALUES (@code, @amount_off_pence)'
+);
+
+seedIfEmpty(
+  'users',
+  [{ username: 'admin', password: 'admin123' }],
+  'INSERT INTO users (username, password) VALUES (@username, @password)'
 );
 
 seedIfEmpty(

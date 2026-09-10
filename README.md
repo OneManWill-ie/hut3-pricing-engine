@@ -46,4 +46,5 @@ without a new table or migration.
 
 - Generated initial project structure and dockerfiles, but in the backend it used an image base that's securty was expired, so I needed to change that. In the initial files it also made a slightly weird database design where each rule would get its own table, I then go it to go back and change that to the current system of a rules table with json.
 - Got it to update the README after making changes
-- Used AI to generate the initial unit test system 
+- Used AI to generate the initial unit test system
+- Used AI to add the API authentication based on how I previously implemented them in a prev. project. This is a basic implementation as it currently doesnt allow you to update your cart ect when logged out, on a real system you'd most likely want people to be able to checkout as a guest but this is just showing how it can work. To add authentication to an endpoint you just need to add 'requireSession' to it.

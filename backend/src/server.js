@@ -1,11 +1,39 @@
 import express from 'express';
 import cors from 'cors';
+import { randomUUID } from 'node:crypto';
 import { db } from './db.js';
 import { priceCart } from './pricing.js';
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-session-uuid'],
+  })
+);
 app.use(express.json());
+
+const requireSession = (req, res, next) => {
+  const sessionUuid = req.get('x-session-uuid');
+
+  if (!sessionUuid) {
+    return res.status(401).json({ error: 'Missing session' });
+  }
+
+  const session = db
+    .prepare(
+      'SELECT * FROM sessions WHERE session_uuid = ? AND expires_at > ?'
+    )
+    .get(sessionUuid, Date.now());
+
+  if (!session) {
+    return res.status(401).json({ error: 'Invalid or expired session' });
+  }
+
+  req.user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(session.user_id);
+  next();
+};
 
 // --- GET /api/cart -----------------------------------------------------
 // Returns the persisted cart as-is (no pricing).
@@ -26,9 +54,38 @@ app.get('/api/items', (req, res) => {
   res.json(db.prepare('SELECT * FROM items ORDER BY id').all());
 });
 
+// --- POST /api/login -----------------------------------------------------
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'username and password are required' });
+  }
+
+  const user = db
+    .prepare('SELECT id, username FROM users WHERE username = ? AND password = ?')
+    .get(username.trim(), password);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+
+  const sessionUuid = randomUUID();
+  const now = Date.now();
+
+  db.prepare(
+    'INSERT INTO sessions (user_id, session_uuid, created_at, expires_at) VALUES (?, ?, ?, ?)'
+  ).run(user.id, sessionUuid, now, now + 1000 * 60 * 60 * 24);
+
+  res.json({
+    session_uuid: sessionUuid,
+    user: { id: user.id, username: user.username },
+  });
+});
+
 // --- POST /api/cart ------------------------------------------------------
 // Add a line item to the cart. Body: { item_id, quantity }
-app.post('/api/cart', (req, res) => {
+app.post('/api/cart', requireSession, (req, res) => {
   const { item_id, quantity } = req.body;
 
   if (!Number.isInteger(item_id) || item_id <= 0) {
@@ -60,7 +117,7 @@ app.post('/api/cart', (req, res) => {
 
 // --- PATCH /api/cart/:id --------------------------------------------------
 // Update the quantity for an existing cart line. Body: { quantity }
-app.patch('/api/cart/:id', (req, res) => {
+app.patch('/api/cart/:id', requireSession, (req, res) => {
   const { quantity } = req.body;
 
   if (!Number.isInteger(quantity) || quantity <= 0) {
@@ -88,7 +145,7 @@ app.patch('/api/cart/:id', (req, res) => {
 });
 
 // --- DELETE /api/cart/:id -------------------------------------------------
-app.delete('/api/cart/:id', (req, res) => {
+app.delete('/api/cart/:id', requireSession, (req, res) => {
   db.prepare('DELETE FROM cart_items WHERE id = ?').run(req.params.id);
   res.status(204).end();
 });

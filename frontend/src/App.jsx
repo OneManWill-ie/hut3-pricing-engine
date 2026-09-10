@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const SESSION_KEY = 'pricing_session_uuid';
+const USER_KEY = 'pricing_session_user';
 
 const gbp = (pence) => `£${(pence / 100).toFixed(2)}`;
 
@@ -10,6 +12,31 @@ export default function App() {
   const [pricing, setPricing] = useState(null);
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState(null);
+  const [sessionUuid, setSessionUuid] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(SESSION_KEY) || '';
+  });
+  const [username, setUsername] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(USER_KEY) || '';
+  });
+  const [loginForm, setLoginForm] = useState({ username: 'admin', password: 'admin123' });
+
+  useEffect(() => {
+    if (sessionUuid) {
+      localStorage.setItem(SESSION_KEY, sessionUuid);
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+    }
+  }, [sessionUuid]);
+
+  useEffect(() => {
+    if (username) {
+      localStorage.setItem(USER_KEY, username);
+    } else {
+      localStorage.removeItem(USER_KEY);
+    }
+  }, [username]);
 
   const loadCart = () =>
     fetch(`${API_URL}/api/cart`)
@@ -41,8 +68,60 @@ export default function App() {
     loadPricing(couponCode);
   };
 
+  const getAuthHeaders = (includeJson = false) => {
+    const headers = {};
+
+    if (includeJson) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (sessionUuid) {
+      headers['x-session-uuid'] = sessionUuid;
+    }
+
+    return headers;
+  };
+
+  const login = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    const response = await fetch(`${API_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loginForm),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      setError(result.error || 'Could not log in');
+      return;
+    }
+
+    const result = await response.json();
+    setSessionUuid(result.session_uuid);
+    setUsername(result.user.username);
+    setLoginForm({ username: '', password: '' });
+  };
+
+  const logout = () => {
+    setSessionUuid('');
+    setUsername('');
+    setError(null);
+  };
+
   const removeItem = async (id) => {
-    await fetch(`${API_URL}/api/cart/${id}`, { method: 'DELETE' });
+    const response = await fetch(`${API_URL}/api/cart/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      setError(result.error || 'Could not remove the cart item');
+      return;
+    }
+
     loadCart();
     loadPricing(couponCode);
   };
@@ -50,7 +129,7 @@ export default function App() {
   const updateItem = async (id) => {
     const response = await fetch(`${API_URL}/api/cart/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify({ quantity: quantities[id] }),
     });
 
@@ -68,6 +147,33 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: 'sans-serif', maxWidth: 480, margin: '2rem auto' }}>
+      {sessionUuid ? (
+        <div style={{ marginBottom: '1rem' }}>
+          <strong>Logged in as {username}</strong>
+          <button onClick={logout} style={{ marginLeft: '0.75rem' }}>
+            Log out
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={login} style={{ marginBottom: '1rem' }}>
+          <h2>Log in</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <input
+              placeholder="Username"
+              value={loginForm.username}
+              onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginForm.password}
+              onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+            />
+            <button type="submit">Log in</button>
+          </div>
+        </form>
+      )}
+
       <h1>Cart</h1>
 
       {cart.length === 0 && <p>Your cart is empty.</p>}

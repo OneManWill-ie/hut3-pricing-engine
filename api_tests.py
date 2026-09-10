@@ -10,6 +10,7 @@ from urllib import error, request
 class ApiClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
+        self.session_uuid = None
 
     def _request(self, method: str, path: str, payload=None):
         url = f"{self.base_url}{path}"
@@ -18,6 +19,8 @@ class ApiClient:
         req = request.Request(url, data=data, method=method)
         if payload is not None:
             req.add_header("Content-Type", "application/json")
+        if self.session_uuid:
+            req.add_header("x-session-uuid", self.session_uuid)
 
         try:
             with request.urlopen(req, timeout=5) as resp:
@@ -49,11 +52,19 @@ class ApiClient:
         status, body = self._request("DELETE", path)
         return status, body
 
+    def login(self, username: str, password: str):
+        status, data = self.post_json("/api/login", {"username": username, "password": password})
+        if status != 200:
+            raise RuntimeError(f"Login failed: {status} {data}")
+        self.session_uuid = data["session_uuid"]
+        return data
+
 
 class PricingApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = ApiClient(args.base_url)
+        cls.client.login("admin", "admin123")
 
     def _reset_cart(self):
         status, cart = self.client.get_json("/api/cart")
