@@ -39,7 +39,6 @@ without a new table or migration.
 
 ## Planned
 
-- Basic auth on the write endpoints (`POST/DELETE /api/cart`).
 - Go through and double check AI generated dependency versions.
 
 ## AI-tool notes
