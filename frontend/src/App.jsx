@@ -8,6 +8,7 @@ const gbp = (pence) => `£${(pence / 100).toFixed(2)}`;
 
 export default function App() {
   const [cart, setCart] = useState([]);
+  const [items, setItems] = useState([]);
   const [quantities, setQuantities] = useState({});
   const [pricing, setPricing] = useState(null);
   const [couponCode, setCouponCode] = useState('');
@@ -38,6 +39,12 @@ export default function App() {
     }
   }, [username]);
 
+  const loadItems = () =>
+    fetch(`${API_URL}/api/items`)
+      .then((r) => r.json())
+      .then(setItems)
+      .catch(() => setError('Could not reach the API'));
+
   const loadCart = () =>
     fetch(`${API_URL}/api/cart`)
       .then((r) => r.json())
@@ -59,6 +66,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    loadItems();
     loadCart();
     loadPricing();
   }, []);
@@ -110,6 +118,28 @@ export default function App() {
     setError(null);
   };
 
+  const addItemToCart = async (itemId) => {
+    if (!sessionUuid) {
+      setError('Please log in before adding items to the cart');
+      return;
+    }
+
+    const response = await fetch(`${API_URL}/api/cart`, {
+      method: 'POST',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({ item_id: itemId, quantity: 1 }),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      setError(result.error || 'Could not add the item to the cart');
+      return;
+    }
+
+    loadCart();
+    loadPricing(couponCode);
+  };
+
   const removeItem = async (id) => {
     const response = await fetch(`${API_URL}/api/cart/${id}`, {
       method: 'DELETE',
@@ -146,7 +176,7 @@ export default function App() {
   if (error) return <p style={{ fontFamily: 'sans-serif', color: 'crimson' }}>{error}</p>;
 
   return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: 480, margin: '2rem auto' }}>
+    <div style={{ fontFamily: 'sans-serif', maxWidth: 550, margin: '2rem auto' }}>
       {sessionUuid ? (
         <div style={{ marginBottom: '1rem' }}>
           <strong>Logged in as {username}</strong>
@@ -173,6 +203,26 @@ export default function App() {
           </div>
         </form>
       )}
+
+      <h2>Shop</h2>
+      <ul style={{ listStyle: 'none', padding: 0, marginBottom: '1.5rem' }}>
+        {items.map((item) => (
+          <li
+            key={item.id}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0.35rem 0',
+            }}
+          >
+            <span>
+              {item.name} ({gbp(item.unit_price_pence)})
+            </span>
+            <button onClick={() => addItemToCart(item.id)}>Add to cart</button>
+          </li>
+        ))}
+      </ul>
 
       <h1>Cart</h1>
 

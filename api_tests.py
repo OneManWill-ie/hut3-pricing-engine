@@ -115,6 +115,8 @@ class PricingApiTests(unittest.TestCase):
 
     def test_add_update_delete_cart_item(self):
         # Covers the full cart lifecycle: add a line item, update its quantity, then delete it.
+        self._reset_cart()
+
         status, items = self.client.get_json("/api/items")
         self.assertEqual(status, 200)
         self.assertTrue(len(items) >= 1)
@@ -134,6 +136,24 @@ class PricingApiTests(unittest.TestCase):
 
         status, result = self.client.delete(f"/api/cart/{cart_id}")
         self.assertEqual(status, 204, result)
+
+    def test_duplicate_cart_item_adds_to_existing_quantity(self):
+        # Verifies adding the same product again merges into the existing cart row.
+        self._reset_cart()
+
+        item_id = self._get_item_id_by_name("Wireless Mouse")
+
+        status, first = self.client.post_json("/api/cart", {"item_id": item_id, "quantity": 1})
+        self.assertEqual(status, 201, first)
+
+        status, second = self.client.post_json("/api/cart", {"item_id": item_id, "quantity": 1})
+        self.assertEqual(status, 201, second)
+
+        status, cart = self.client.get_json("/api/cart")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(cart), 1)
+        self.assertEqual(cart[0]["item_id"], item_id)
+        self.assertEqual(cart[0]["quantity"], 2)
 
     def test_price_endpoint_returns_breakdown(self):
         # Verifies the pricing endpoint returns the expected pricing structure and totals.

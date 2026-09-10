@@ -99,6 +99,27 @@ app.post('/api/cart', requireSession, (req, res) => {
     return res.status(404).json({ error: `Unknown item id ${item_id}` });
   }
 
+  const existing = db
+    .prepare('SELECT id, quantity FROM cart_items WHERE item_id = ?')
+    .get(item_id);
+  // If the item is already in the cart, increment its quantity instead of adding a new row.
+  if (existing) {
+    const nextQuantity = existing.quantity + quantity;
+
+    db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(nextQuantity, existing.id);
+
+    return res.status(201).json(
+      db
+        .prepare(`
+          SELECT cart_items.id, cart_items.item_id, items.name, items.unit_price_pence, cart_items.quantity
+          FROM cart_items
+          JOIN items ON items.id = cart_items.item_id
+          WHERE cart_items.id = ?
+        `)
+        .get(existing.id)
+    );
+  }
+
   const { lastInsertRowid } = db
     .prepare('INSERT INTO cart_items (item_id, quantity) VALUES (?, ?)')
     .run(item_id, quantity);
