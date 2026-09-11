@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import unittest
+import uuid
 from urllib import error, request
 
 
@@ -163,6 +164,35 @@ class PricingApiTests(unittest.TestCase):
         self.assertIn("total_pence", data)
         self.assertIn("line_items", data)
         self.assertIn("discounts", data)
+
+    def test_add_existing_discount_rule(self):
+        # Verifies an authenticated user can add a rule type supported by the pricing engine.
+        status, data = self.client.post_json(
+            "/api/rules",
+            {
+                "type": "percent",
+                "config": {"threshold_pence": 100000, "percent_off": 5},
+            },
+        )
+        self.assertEqual(status, 201, data)
+        self.assertEqual(data["type"], "percent")
+        self.assertEqual(data["config"]["percent_off"], 5)
+
+    def test_add_coupon_code_normalizes_and_rejects_duplicates(self):
+        # Verifies coupon codes are stored consistently and cannot be added twice.
+        code = f"TEST{uuid.uuid4().hex[:8]}"
+        status, data = self.client.post_json(
+            "/api/coupons",
+            {"code": f"  {code.lower()}  ", "amount_off_pence": 250},
+        )
+        self.assertEqual(status, 201, data)
+        self.assertEqual(data["code"], code.upper())
+
+        status, data = self.client.post_json(
+            "/api/coupons",
+            {"code": code, "amount_off_pence": 250},
+        )
+        self.assertEqual(status, 409, data)
 
     def test_business_coupon_error_is_reported_without_crashing(self):
         # Verifies unknown coupon codes are surfaced as a coupon error instead of breaking pricing.

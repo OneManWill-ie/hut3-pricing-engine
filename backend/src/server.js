@@ -35,6 +35,39 @@ const requireSession = (req, res, next) => {
   next();
 };
 
+const isPositiveInteger = (value) => Number.isInteger(value) && value > 0;
+
+const validateRuleConfig = (type, config) => {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return 'config must be an object';
+  }
+
+  if (type === 'percent') {
+    if (!isPositiveInteger(config.threshold_pence)) {
+      return 'threshold_pence must be a positive integer';
+    }
+    if (!isPositiveInteger(config.percent_off) || config.percent_off > 100) {
+      return 'percent_off must be an integer between 1 and 100';
+    }
+    return null;
+  }
+
+  if (type === 'bxgy') {
+    if (typeof config.item_name !== 'string' || !config.item_name.trim()) {
+      return 'item_name is required';
+    }
+    if (!isPositiveInteger(config.buy_quantity)) {
+      return 'buy_quantity must be a positive integer';
+    }
+    if (!isPositiveInteger(config.free_quantity)) {
+      return 'free_quantity must be a positive integer';
+    }
+    return null;
+  }
+
+  return 'type must be one of: percent, bxgy';
+};
+
 // --- GET /api/cart -----------------------------------------------------
 // Returns the persisted cart as-is (no pricing).
 app.get('/api/cart', (req, res) => {
@@ -81,6 +114,47 @@ app.post('/api/login', (req, res) => {
     session_uuid: sessionUuid,
     user: { id: user.id, username: user.username },
   });
+});
+
+// --- POST /api/rules ------------------------------------------------------
+// Add a rule using one of the discount types supported by the pricing engine.
+app.post('/api/rules', requireSession, (req, res) => {
+  const { type, config } = req.body || {};
+  const validationError = validateRuleConfig(type, config);
+
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
+  const result = db
+    .prepare('INSERT INTO rules (type, config) VALUES (?, ?)')
+    .run(type, JSON.stringify({ ...config, item_name: config.item_name?.trim() }));
+
+  res.status(201).json({ id: Number(result.lastInsertRowid), type, config });
+});
+
+// --- POST /api/coupons ----------------------------------------------------
+// Add a flat-amount coupon code.
+app.post('/api/coupons', requireSession, (req, res) => {
+  const { code, amount_off_pence } = req.body || {};
+  const normalizedCode = typeof code === 'string' ? code.trim().toUpperCase() : '';
+
+  if (!normalizedCode) {
+    return res.status(400).json({ error: 'code is required' });
+  }
+  if (!isPositiveInteger(amount_off_pence)) {
+    return res.status(400).json({ error: 'amount_off_pence must be a positive integer' });
+  }
+  if (db.prepare('SELECT 1 FROM coupons WHERE code = ?').get(normalizedCode)) {
+    return res.status(409).json({ error: `Coupon code "${normalizedCode}" already exists` });
+  }
+
+  db.prepare('INSERT INTO coupons (code, amount_off_pence) VALUES (?, ?)').run(
+    normalizedCode,
+    amount_off_pence
+  );
+
+  res.status(201).json({ code: normalizedCode, amount_off_pence });
 });
 
 // --- POST /api/cart ------------------------------------------------------

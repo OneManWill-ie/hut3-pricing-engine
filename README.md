@@ -39,6 +39,28 @@ endpoint, while keeping the cart and its quantities in the database as required.
 `POST /api/price` accepts an optional coupon body such as
 `{ "coupon_code": "SAVE5" }` and prices the current persisted cart.
 
+Authenticated users can add supported discount rules with `POST /api/rules`:
+
+```json
+{
+   "type": "percent",
+   "config": { "threshold_pence": 5000, "percent_off": 10 }
+}
+```
+
+The other supported rule type is `bxgy`, with `item_name`, `buy_quantity`, and
+`free_quantity` in its config. Flat-amount coupon codes can be added with
+`POST /api/coupons`:
+
+```json
+{
+   "code": "SPRING10",
+   "amount_off_pence": 1000
+}
+```
+
+Both endpoints require the `x-session-uuid` header from `POST /api/login`.
+
 ## Current discount ordering
 
 1. Buy-X-get-Y-free rules first as they change how many units are actually being paid for, which everything
@@ -51,7 +73,6 @@ endpoint, while keeping the cart and its quantities in the database as required.
 ## Planned
 
 - Go through and double check AI generated dependency versions.
-- Add JSON validation for new rules
 
 ## AI-tool notes
 
