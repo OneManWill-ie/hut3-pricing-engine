@@ -250,7 +250,7 @@ export default function App() {
                 style={{ width: '3rem' }}
               />{' '}
               <button onClick={() => updateItem(item.id)}>Update</button>{' '}
-              {gbp(item.unit_price_pence * (quantities[item.id] ?? item.quantity))}{' '}
+              {gbp(item.unit_price_pence * item.quantity)}{' '}
               <button onClick={() => removeItem(item.id)}>remove</button>
             </span>
           </li>

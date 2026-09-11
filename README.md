@@ -51,6 +51,7 @@ endpoint, while keeping the cart and its quantities in the database as required.
 ## Planned
 
 - Go through and double check AI generated dependency versions.
+- Add JSON validation for new rules
 
 ## AI-tool notes
 
